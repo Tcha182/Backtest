@@ -81,10 +81,8 @@ dist_blob_path = f"plots/distribution_{selected_duration}_years.png"
 dist_image = get_or_download_plot(dist_blob_path)
 st.image(dist_image, use_column_width=True)
 
-# Side-by-side layout for risk curve and box plot
-st.subheader("Risk and Box Plots")
 
-
+st.subheader("Risk and potential Reward")
 # Load and display risk curve for selected duration
 
 risk_curve_blob_path = f"plots/risk_curve_{selected_duration}_years.png"

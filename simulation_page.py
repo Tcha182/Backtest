@@ -133,8 +133,8 @@ if st.button("Run Simulations"):
     results_df = pd.DataFrame(all_results)
     results_df['Strategy'] = ['S&P 500'] * len(results_sp500) + ['Leveraged S&P 500'] * len(results_leveraged)
     results_df['Duration (Years)'] = (results_df['Duration (Days)'] / 252).round().astype(int)
-    #results_df.to_csv("simulation_results.csv", index=False)
-    gcs_utils.upload_to_gcs(GS_BUCKET_NAME, "simulation_results.csv", "data/simulation_results.csv")
+    results_df.to_csv("simulation_results.csv", index=False)
+    gcs_utils.upload_to_gcs(GS_BUCKET_NAME, "simulation_results.csv", "data/simulation_results.csv", timeout=600)
 
     # Summary table
     summary_table = results_df.groupby(['Duration (Years)', 'Strategy']).agg(
@@ -146,7 +146,7 @@ if st.button("Run Simulations"):
         Mean_Fee=('Total Fee (€)', 'mean'),
         Positive_Return_Percentage=('Total Return', lambda x: (x > 0).mean() * 100)
     ).reset_index()
-    #summary_table.to_csv("summary_table.csv", index=False)
+    summary_table.to_csv("summary_table.csv", index=False)
     gcs_utils.upload_to_gcs(GS_BUCKET_NAME, "summary_table.csv", "data/summary_table.csv")
 
     # Create plots
@@ -155,19 +155,39 @@ if st.button("Run Simulations"):
 
     for i, duration in enumerate(sorted(results_df['Duration (Years)'].unique()), 1):
         status_text.text(f"Creating distribution plot for {duration}-year duration")
+        
+        # Filter data for the specific duration
         duration_data = results_df[results_df['Duration (Years)'] == duration]
+        
+        # Create the distribution plot
         fig, ax = plt.subplots(figsize=(10, 6))
+        
+        # Plot distribution with KDE (Kernel Density Estimation)
         sns.histplot(data=duration_data, x='End Portfolio Value (€)', hue='Strategy', kde=True, ax=ax)
-        avg_invested = duration * 12 * monthly_investment
-        ax.axvline(avg_invested, color='red', linestyle='--', label=f'Average Invested (€{avg_invested:,.0f})')
+        
+        # Calculate the 95th percentile for scaling
+        upper_limit = duration_data['End Portfolio Value (€)'].quantile(0.95) * 1.1  # Add 10% for margin
+        ax.set_xlim(0, upper_limit)
+        
+        # Calculate the average invested amount specifically for this duration
+        avg_invested_simulated = duration_data['Total Invested (€)'].mean()
+        
+        # Draw the average invested line on the chart
+        ax.axvline(avg_invested_simulated, color='red', linestyle='--', label=f'Average Invested (€{avg_invested_simulated:,.0f})')
+                    
+        # Set labels, title, and formatting
         ax.set_title(f"End Portfolio Value Distribution for {duration}-Year Duration")
         ax.set_xlabel("End Portfolio Value (€)")
-        ax.get_yaxis().set_visible(False)
+        ax.get_yaxis().set_visible(False)  # Hide frequency axis for a cleaner look
         ax.xaxis.set_major_formatter(FuncFormatter(currency_format))
-        sns.despine(left=True)
+        sns.despine(left=True)  # Remove plot borders
         ax.legend()
+        
+        # Save plot to GCS
         save_fig_to_gcs(fig, f"distribution_{duration}_years.png")
         chart_progress_bar.progress(i / (total_durations * 3))
+
+
 
     for i, duration in enumerate(sorted(results_df['Duration (Years)'].unique()), 1):
         status_text.text(f"Creating risk curve for {duration}-year duration")
@@ -190,13 +210,22 @@ if st.button("Run Simulations"):
     for i, duration in enumerate(sorted(results_df['Duration (Years)'].unique()), 1):
         status_text.text(f"Creating box plot for {duration}-year duration")
         fig, ax = plt.subplots(figsize=(12, 6))
+        
+        # Set y-axis to logarithmic scale
+        ax.set_yscale("log")
+        
+        # Plot grey boxes without a legend
         sns.boxplot(data=results_df, x='Duration (Years)', y='End Portfolio Value (€)', hue='Strategy', palette="Greys", ax=ax, dodge=True, legend=False)
+        
+        # Highlight box for the selected duration with a color legend
         sns.boxplot(data=results_df[results_df['Duration (Years)'] == duration], x='Duration (Years)', y='End Portfolio Value (€)', hue='Strategy', palette="bright", ax=ax)
+        
         ax.set_title(f"Final Portfolio Values for {duration}-Year Duration")
         ax.set_xlabel("Investment Duration (Years)")
         ax.set_ylabel("End Portfolio Value (€)")
         ax.yaxis.set_major_formatter(FuncFormatter(currency_format))
-        sns.despine()
+        sns.despine()  # Remove plot borders
+        
         save_fig_to_gcs(fig, f"box_plot_{duration}_years.png")
         chart_progress_bar.progress((i + total_durations * 2) / (total_durations * 3))
 

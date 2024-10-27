@@ -9,6 +9,9 @@ __pycache__/
 # Google Cloud credentials and environment variables
 .env
 
+# Data
+*.csv
+
 
 # Virtual environment
 env/

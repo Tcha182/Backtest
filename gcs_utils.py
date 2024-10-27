@@ -11,13 +11,14 @@ def initialize_client():
     credentials = service_account.Credentials.from_service_account_info(json.loads(credentials_json))
     return storage.Client(credentials=credentials)
 
-def upload_to_gcs(bucket_name, source_file_name, destination_blob_name):
-    """Uploads a file to the GCS bucket."""
+def upload_to_gcs(bucket_name, source_file_name, destination_blob_name, timeout=600):
+    """Uploads a file to the GCS bucket with an adjustable timeout."""
     client = initialize_client()
     bucket = client.bucket(bucket_name)
     blob = bucket.blob(destination_blob_name)
 
-    blob.upload_from_filename(source_file_name)
+    # Setting a higher timeout to handle larger files
+    blob.upload_from_filename(source_file_name, timeout=timeout)
     print(f"File {source_file_name} uploaded to {destination_blob_name}.")
 
 def download_from_gcs(bucket_name, blob_name):
