@@ -1,9 +1,7 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
 import os
-from numerize import numerize  # Install this with 'pip install numerize'
+from numerize import numerize
 
 output_dir = "simulation_outputs"
 
@@ -75,14 +73,14 @@ dist_path = f"{output_dir}/distribution_{selected_duration}_years.png"
 if os.path.exists(dist_path):
     st.image(dist_path)
 
-# Display risk curve
-st.subheader("Risk Curve: Likelihood of Negative Returns by Duration")
-risk_curve_path = f"{output_dir}/risk_curve.png"
+# Load and display risk curve for selected duration
+st.subheader(f"Risk Curve for {selected_duration}-Year Duration")
+risk_curve_path = f"{output_dir}/risk_curve_{selected_duration}_years.png"
 if os.path.exists(risk_curve_path):
     st.image(risk_curve_path)
 
-# Display box plot of final portfolio values by duration and strategy
-st.subheader("Box Plot of Final Portfolio Values by Duration and Strategy")
-box_plot_path = f"{output_dir}/box_plot.png"
+# Load and display box plot for selected duration
+st.subheader(f"Box Plot of Final Portfolio Values for {selected_duration}-Year Duration")
+box_plot_path = f"{output_dir}/box_plot_{selected_duration}_years.png"
 if os.path.exists(box_plot_path):
     st.image(box_plot_path)
