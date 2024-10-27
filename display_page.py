@@ -12,12 +12,13 @@ GS_BUCKET_NAME = st.secrets["GS_CREDENTIALS"]["GS_BUCKET_NAME"]
 # Load data from GCS
 @st.cache_data
 def load_results():
-    results_data = gcs_utils.download_from_gcs(GS_BUCKET_NAME, "data/simulation_results.csv")
+    #results_data = gcs_utils.download_from_gcs(GS_BUCKET_NAME, "data/simulation_results.csv")
     summary_data = gcs_utils.download_from_gcs(GS_BUCKET_NAME, "data/summary_table.csv")
     
-    results_df = pd.read_csv(results_data)
+    #results_df = pd.read_csv(results_data)
     summary_table = pd.read_csv(summary_data)
-    
+    results_df = summary_table.copy()
+
     return results_df, summary_table
 
 # Helper function to get or download a plot image
