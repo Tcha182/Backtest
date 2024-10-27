@@ -1,5 +1,3 @@
-# simulation_page.py
-
 import streamlit as st
 import yfinance as yf
 import pandas as pd
@@ -10,6 +8,13 @@ from concurrent.futures import ThreadPoolExecutor
 import seaborn as sns
 import os
 import logging
+from dotenv import load_dotenv
+from matplotlib.ticker import FuncFormatter
+import gcs_utils  # Ensure you have the GCS utility module configured as shown previously
+
+# Load environment variables
+load_dotenv()
+GS_BUCKET_NAME = os.getenv("GS_BUCKET_NAME")
 
 # Set up logging to capture errors
 logging.basicConfig(level=logging.ERROR, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -19,13 +24,9 @@ st.title("Optimized Investment Simulation")
 @st.cache_data
 def load_data():
     ticker = '^GSPC'
-    sp500_data = yf.download(ticker, start='1930-01-01', end=datetime.today().strftime('%Y-%m-%d'))
+    sp500_data = yf.download(ticker, start='1928-01-01', end=datetime.today().strftime('%Y-%m-%d'))
     sp500_data = sp500_data['Adj Close']
     return sp500_data
-
-# Set up directory to store outputs
-output_dir = "simulation_outputs"
-os.makedirs(output_dir, exist_ok=True)
 
 # Load data
 data_load_state = st.text('Loading data...')
@@ -51,22 +52,25 @@ def simulate_investment(args):
     end_idx = start_idx + duration_days
     if end_idx >= len(daily_prices_array):
         return None
-    
+
     simulation_prices = daily_prices_array[start_idx:end_idx + 1].flatten()
     if len(simulation_prices) != duration_days + 1:
         return None
 
     daily_returns = np.diff(simulation_prices) / simulation_prices[:-1]
-    daily_fee = (1 + annual_fee) ** (1 / 252) - 1
-    daily_returns = daily_returns * leverage - daily_fee
+    daily_fee_rate = (1 + annual_fee) ** (1 / 252) - 1  # Daily fee as a percentage
 
-    cumulative_returns = np.cumprod(1 + daily_returns[:duration_days])
-    reverse_cumulative_returns = cumulative_returns[-1] / cumulative_returns[:duration_days]
-    future_values = daily_investment * reverse_cumulative_returns[:duration_days]
+    leveraged_daily_returns = daily_returns * leverage
+    cumulative_returns = np.cumprod(1 + leveraged_daily_returns)
+
+    invested_amounts = np.cumsum(np.full(duration_days, daily_investment))
+    portfolio_values = invested_amounts * cumulative_returns
+    daily_fees = portfolio_values * daily_fee_rate
+    net_portfolio_values = portfolio_values - np.cumsum(daily_fees)
 
     total_invested = daily_investment * duration_days
-    total_value = np.sum(future_values)
-    total_fee = annual_fee * (duration_days / 252) * total_invested
+    total_value = net_portfolio_values[-1]
+    total_fee = np.sum(daily_fees)
     total_return = (total_value - total_invested) / total_invested
     annualized_return = (1 + total_return) ** (252 / duration_days) - 1
 
@@ -94,82 +98,109 @@ def run_simulations(num_simulations, min_duration_days, max_duration_days, daily
 
     simulation_results = []
     batch_size = 100
+    progress_bar = st.progress(0)
     for i in range(0, len(simulation_args), batch_size):
         batch_args = simulation_args[i:i + batch_size]
         with ThreadPoolExecutor(max_workers=4) as executor:
             batch_results = list(executor.map(simulate_investment, batch_args))
             simulation_results.extend([res for res in batch_results if res is not None])
+        progress_bar.progress((i + batch_size) / len(simulation_args))
 
     return simulation_results
 
-# Run simulations and save results
-progress_bar = st.progress(0)
-status_text = st.empty()
-
-status_text.text("Running simulations for S&P 500")
-results_sp500 = run_simulations(num_simulations, min_duration_days, max_duration_days, daily_prices, daily_investment, sp500_annual_fee, leverage=1.0)
-progress_bar.progress(0.5)
-
-status_text.text("Running simulations for Leveraged S&P 500")
-results_leveraged = run_simulations(num_simulations, min_duration_days, max_duration_days, daily_prices, daily_investment, leveraged_annual_fee, leverage=2.0)
-progress_bar.progress(1.0)
-
-# Save results to DataFrame
-all_results = results_sp500 + results_leveraged
-results_df = pd.DataFrame(all_results)
-results_df['Strategy'] = ['S&P 500'] * len(results_sp500) + ['Leveraged S&P 500'] * len(results_leveraged)
-results_df['Duration (Years)'] = (results_df['Duration (Days)'] / 252).round().astype(int)
-results_df.to_csv(f"{output_dir}/simulation_results.csv", index=False)
-
-# Summary table
-summary_table = results_df.groupby(['Duration (Years)', 'Strategy']).agg(
-    Mean_End_Value=('End Portfolio Value (€)', 'mean'),
-    Median_End_Value=('End Portfolio Value (€)', 'median'),
-    Min_End_Value=('End Portfolio Value (€)', 'min'),
-    Max_End_Value=('End Portfolio Value (€)', 'max'),
-    Mean_Invested_Amount=('Total Invested (€)', 'mean'),
-    Mean_Fee=('Total Fee (€)', 'mean'),
-    Positive_Return_Percentage=('Total Return', lambda x: (x > 0).mean() * 100)
-).reset_index()
-summary_table.to_csv(f"{output_dir}/summary_table.csv", index=False)
-
-# Create plots
-from matplotlib.ticker import FuncFormatter
+# Function to save plot to GCS
+def save_fig_to_gcs(fig, file_name):
+    local_path = f"{file_name}"  # Temporarily save locally
+    fig.savefig(local_path)
+    gcs_utils.upload_to_gcs(GS_BUCKET_NAME, local_path, f"plots/{file_name}")
+    os.remove(local_path)  # Remove local file after upload
+    plt.close(fig)  # Close figure to save memory
 
 def currency_format(x, pos):
     return f'€{x:,.0f}'
 
-for duration in sorted(results_df['Duration (Years)'].unique()):
-    duration_data = results_df[results_df['Duration (Years)'] == duration]
-    fig, ax = plt.subplots(figsize=(10, 6))
-    sns.histplot(data=duration_data, x='End Portfolio Value (€)', hue='Strategy', kde=True, ax=ax)
+# Button to start simulation
+if st.button("Run Simulations"):
+    # Run simulations and save results
+    status_text = st.empty()
     
-    avg_invested = duration * 12 * monthly_investment
-    ax.axvline(avg_invested, color='red', linestyle='--', label=f'Average Invested (€{avg_invested:,.2f})')
-    ax.set_title(f"End Portfolio Value Distribution for {duration}-Year Duration")
-    ax.set_xlabel("End Portfolio Value (€)")
-    ax.set_ylabel("Frequency")
-    ax.xaxis.set_major_formatter(FuncFormatter(currency_format))
-    ax.legend()
-    fig.savefig(f"{output_dir}/distribution_{duration}_years.png")
+    status_text.text("Running simulations for S&P 500")
+    results_sp500 = run_simulations(num_simulations, min_duration_days, max_duration_days, daily_prices, daily_investment, sp500_annual_fee, leverage=1.0)
+    
+    status_text.text("Running simulations for Leveraged S&P 500")
+    results_leveraged = run_simulations(num_simulations, min_duration_days, max_duration_days, daily_prices, daily_investment, leveraged_annual_fee, leverage=2.0)
+    
+    # Save results to DataFrame
+    all_results = results_sp500 + results_leveraged
+    results_df = pd.DataFrame(all_results)
+    results_df['Strategy'] = ['S&P 500'] * len(results_sp500) + ['Leveraged S&P 500'] * len(results_leveraged)
+    results_df['Duration (Years)'] = (results_df['Duration (Days)'] / 252).round().astype(int)
+    results_df.to_csv("simulation_results.csv", index=False)
+    gcs_utils.upload_to_gcs(GS_BUCKET_NAME, "simulation_results.csv", "data/simulation_results.csv")
 
-# Risk Curve
-risk_curve = results_df.groupby(['Duration (Years)', 'Strategy'], as_index=False).apply(
-    lambda x: pd.Series({
-        "Negative Return Probability (%)": (x['Total Return'] < 0).mean() * 100
-    })
-).reset_index(drop=True)
+    # Summary table
+    summary_table = results_df.groupby(['Duration (Years)', 'Strategy']).agg(
+        Mean_End_Value=('End Portfolio Value (€)', 'mean'),
+        Median_End_Value=('End Portfolio Value (€)', 'median'),
+        Min_End_Value=('End Portfolio Value (€)', 'min'),
+        Max_End_Value=('End Portfolio Value (€)', 'max'),
+        Mean_Invested_Amount=('Total Invested (€)', 'mean'),
+        Mean_Fee=('Total Fee (€)', 'mean'),
+        Positive_Return_Percentage=('Total Return', lambda x: (x > 0).mean() * 100)
+    ).reset_index()
+    summary_table.to_csv("summary_table.csv", index=False)
+    gcs_utils.upload_to_gcs(GS_BUCKET_NAME, "summary_table.csv", "data/summary_table.csv")
 
-fig, ax = plt.subplots(figsize=(10, 6))
-sns.lineplot(data=risk_curve, x='Duration (Years)', y='Negative Return Probability (%)', hue='Strategy', hue_order=['S&P 500', 'Leveraged S&P 500'], ax=ax)
-ax.set_title("Risk Curve: Likelihood of Negative Returns by Duration")
-ax.set_xlabel("Investment Duration (Years)")
-ax.set_ylabel("Probability of Negative Returns (%)")
-fig.savefig(f"{output_dir}/risk_curve.png")
+    # Create plots
+    total_durations = len(results_df['Duration (Years)'].unique())
+    chart_progress_bar = st.progress(0)
 
-fig, ax = plt.subplots(figsize=(12, 6))
-sns.boxplot(data=results_df, x='Duration (Years)', y='End Portfolio Value (€)', hue='Strategy', ax=ax)
-ax.set_title("Final Portfolio Values by Duration and Strategy")
-ax.set_xlabel("Investment Duration (Years)")
-ax.set_ylabel("End Portfolio Value (€)")
-fig.savefig(f"{output_dir}/box_plot.png")
+    for i, duration in enumerate(sorted(results_df['Duration (Years)'].unique()), 1):
+        status_text.text(f"Creating distribution plot for {duration}-year duration")
+        duration_data = results_df[results_df['Duration (Years)'] == duration]
+        fig, ax = plt.subplots(figsize=(10, 6))
+        sns.histplot(data=duration_data, x='End Portfolio Value (€)', hue='Strategy', kde=True, ax=ax)
+        avg_invested = duration * 12 * monthly_investment
+        ax.axvline(avg_invested, color='red', linestyle='--', label=f'Average Invested (€{avg_invested:,.0f})')
+        ax.set_title(f"End Portfolio Value Distribution for {duration}-Year Duration")
+        ax.set_xlabel("End Portfolio Value (€)")
+        ax.get_yaxis().set_visible(False)
+        ax.xaxis.set_major_formatter(FuncFormatter(currency_format))
+        sns.despine(left=True)
+        ax.legend()
+        save_fig_to_gcs(fig, f"distribution_{duration}_years.png")
+        chart_progress_bar.progress(i / (total_durations * 3))
+
+    for i, duration in enumerate(sorted(results_df['Duration (Years)'].unique()), 1):
+        status_text.text(f"Creating risk curve for {duration}-year duration")
+        fig, ax = plt.subplots(figsize=(10, 6))
+        risk_data = results_df.groupby(['Duration (Years)', 'Strategy'], as_index=False).apply(
+            lambda x: pd.Series({"Negative Return Probability (%)": (x['Total Return'] < 0).mean() * 100})
+        )
+        sns.lineplot(data=risk_data, x='Duration (Years)', y='Negative Return Probability (%)', hue='Strategy', hue_order=['S&P 500', 'Leveraged S&P 500'], ax=ax)
+        selected_risk_data = risk_data[risk_data['Duration (Years)'] == duration]
+        sns.scatterplot(data=selected_risk_data, x='Duration (Years)', y='Negative Return Probability (%)', hue='Strategy', hue_order=['S&P 500', 'Leveraged S&P 500'], s=100, ax=ax, legend=False)
+        for _, row in selected_risk_data.iterrows():
+            ax.text(row['Duration (Years)'], row['Negative Return Probability (%)'] + 1, f"{row['Negative Return Probability (%)']:.1f}%", ha='center')
+        ax.set_title("Risk Curve: Likelihood of Negative Returns by Duration")
+        ax.set_xlabel("Investment Duration (Years)")
+        ax.set_ylabel("Probability of Negative Returns (%)")
+        sns.despine()
+        save_fig_to_gcs(fig, f"risk_curve_{duration}_years.png")
+        chart_progress_bar.progress((i + total_durations) / (total_durations * 3))
+
+    for i, duration in enumerate(sorted(results_df['Duration (Years)'].unique()), 1):
+        status_text.text(f"Creating box plot for {duration}-year duration")
+        fig, ax = plt.subplots(figsize=(12, 6))
+        sns.boxplot(data=results_df, x='Duration (Years)', y='End Portfolio Value (€)', hue='Strategy', palette="Greys", ax=ax, dodge=True, legend=False)
+        sns.boxplot(data=results_df[results_df['Duration (Years)'] == duration], x='Duration (Years)', y='End Portfolio Value (€)', hue='Strategy', palette="bright", ax=ax)
+        ax.set_title(f"Final Portfolio Values for {duration}-Year Duration")
+        ax.set_xlabel("Investment Duration (Years)")
+        ax.set_ylabel("End Portfolio Value (€)")
+        ax.yaxis.set_major_formatter(FuncFormatter(currency_format))
+        sns.despine()
+        save_fig_to_gcs(fig, f"box_plot_{duration}_years.png")
+        chart_progress_bar.progress((i + total_durations * 2) / (total_durations * 3))
+
+    st.success("Simulations and chart creation completed successfully!")
+    status_text.text("All tasks completed.")
