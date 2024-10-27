@@ -10,7 +10,6 @@ from concurrent.futures import ThreadPoolExecutor
 import seaborn as sns
 import os
 import logging
-from numerize import numerize  # Make sure to install numerize
 
 # Set up logging to capture errors
 logging.basicConfig(level=logging.ERROR, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -132,15 +131,6 @@ summary_table = results_df.groupby(['Duration (Years)', 'Strategy']).agg(
     Mean_Fee=('Total Fee (€)', 'mean'),
     Positive_Return_Percentage=('Total Return', lambda x: (x > 0).mean() * 100)
 ).reset_index()
-
-# Format numbers in summary table using `numerize`
-summary_table['Mean_End_Value'] = summary_table['Mean_End_Value'].apply(lambda x: numerize.numerize(x, 1))
-summary_table['Median_End_Value'] = summary_table['Median_End_Value'].apply(lambda x: numerize.numerize(x, 1))
-summary_table['Min_End_Value'] = summary_table['Min_End_Value'].apply(lambda x: numerize.numerize(x, 1))
-summary_table['Max_End_Value'] = summary_table['Max_End_Value'].apply(lambda x: numerize.numerize(x, 1))
-summary_table['Mean_Invested_Amount'] = summary_table['Mean_Invested_Amount'].apply(lambda x: numerize.numerize(x, 1))
-summary_table['Mean_Fee'] = summary_table['Mean_Fee'].apply(lambda x: numerize.numerize(x, 1))
-
 summary_table.to_csv(f"{output_dir}/summary_table.csv", index=False)
 
 # Create plots
