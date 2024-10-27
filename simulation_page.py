@@ -35,8 +35,8 @@ data_load_state.text('Data loaded successfully!')
 
 # Simulation parameters
 num_simulations = st.number_input('Number of Simulations', min_value=100, max_value=1000000, value=1000, step=100)
-min_duration_years = st.number_input('Minimum Duration (Years)', min_value=1, max_value=30, value=1, step=1)
-max_duration_years = st.number_input('Maximum Duration (Years)', min_value=1, max_value=30, value=20, step=1)
+min_duration_years = st.number_input('Minimum Duration (Years)', min_value=1, max_value=40, value=1, step=1)
+max_duration_years = st.number_input('Maximum Duration (Years)', min_value=1, max_value=40, value=30, step=1)
 min_duration_days = int(min_duration_years * 252)
 max_duration_days = int(max_duration_years * 252)
 
@@ -135,7 +135,7 @@ if st.button("Run Simulations"):
     results_df = pd.DataFrame(all_results)
     results_df['Strategy'] = ['S&P 500'] * len(results_sp500) + ['Leveraged S&P 500'] * len(results_leveraged)
     results_df['Duration (Years)'] = (results_df['Duration (Days)'] / 252).round().astype(int)
-    results_df.to_csv("simulation_results.csv", index=False)
+    #results_df.to_csv("simulation_results.csv", index=False)
     gcs_utils.upload_to_gcs(GS_BUCKET_NAME, "simulation_results.csv", "data/simulation_results.csv")
 
     # Summary table
@@ -148,7 +148,7 @@ if st.button("Run Simulations"):
         Mean_Fee=('Total Fee (€)', 'mean'),
         Positive_Return_Percentage=('Total Return', lambda x: (x > 0).mean() * 100)
     ).reset_index()
-    summary_table.to_csv("summary_table.csv", index=False)
+    #summary_table.to_csv("summary_table.csv", index=False)
     gcs_utils.upload_to_gcs(GS_BUCKET_NAME, "summary_table.csv", "data/summary_table.csv")
 
     # Create plots
