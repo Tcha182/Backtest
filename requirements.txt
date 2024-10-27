@@ -1,0 +1,6 @@
+streamlit
+yfinance
+seaborn
+pandas
+numpy
+numerize
