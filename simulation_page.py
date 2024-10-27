@@ -8,13 +8,11 @@ from concurrent.futures import ThreadPoolExecutor
 import seaborn as sns
 import os
 import logging
-from dotenv import load_dotenv
 from matplotlib.ticker import FuncFormatter
 import gcs_utils  # Ensure you have the GCS utility module configured as shown previously
 
 # Load environment variables
-load_dotenv()
-GS_BUCKET_NAME = os.getenv("GS_BUCKET_NAME")
+GS_BUCKET_NAME = st.secrets["GS_CREDENTIALS"]["GS_BUCKET_NAME"]
 
 # Set up logging to capture errors
 logging.basicConfig(level=logging.ERROR, format='%(asctime)s - %(levelname)s - %(message)s')

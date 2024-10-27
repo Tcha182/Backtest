@@ -5,5 +5,4 @@ pandas
 numpy
 numerize
 
-python-dotenv
 google-cloud-storage

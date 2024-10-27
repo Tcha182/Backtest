@@ -7,7 +7,7 @@ import os
 st.set_page_config("Leveraged S&P500", page_icon=":chart_with_upwards_trend:")
 
 # Specify your GCS bucket name
-GS_BUCKET_NAME = os.getenv("GS_BUCKET_NAME")
+GS_BUCKET_NAME = st.secrets["GS_CREDENTIALS"]["GS_BUCKET_NAME"]
 
 # Load data from GCS
 @st.cache_data

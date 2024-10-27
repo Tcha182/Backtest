@@ -1,16 +1,15 @@
+import streamlit as st
 import os
+from google.oauth2 import service_account
 from google.cloud import storage
-from dotenv import load_dotenv
 from io import BytesIO
-
-# Load environment variables from .env file
-load_dotenv()
+import json
 
 # Initialize Google Cloud Storage client using environment credentials
 def initialize_client():
-    credentials_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = credentials_path
-    return storage.Client()
+    credentials_json = st.secrets["GS_CREDENTIALS"]["google_credentials_json"]
+    credentials = service_account.Credentials.from_service_account_info(json.loads(credentials_json))
+    return storage.Client(credentials=credentials)
 
 def upload_to_gcs(bucket_name, source_file_name, destination_blob_name):
     """Uploads a file to the GCS bucket."""
