@@ -1,9 +1,15 @@
 
-# Investment Simulation with Leveraged S&P 500 and Global Indices
+## How Risky Can It Be? Simulating Returns of Index Funds and Their 2x Daily Leveraged “Evil Twins”
 
-This project is a Streamlit-based application for simulating long-term investment strategies across multiple global indices.
-It allows for analyzing different strategies (like leveraged and standard S&P 500) with customizable parameters, investment fees, and durations.
-Results and plots are saved in Google Cloud Storage (GCS) for easy access and display.
+Access the app here: https://leveraged.streamlit.app/
+
+In 2019, I cautiously invested a small portion of my savings in a 2x Daily Leveraged S&P 500 index fund. Five years later, this “test” became my best investment to date. But should I commit more? How can I balance the elevated risk?
+
+To tackle these questions, I needed a fact-based approach to understand how leveraged investments work and how they compare to a standard total market index fund. This tool simulates millions of possible outcomes across different strategies, leveraging historical returns of major indices worldwide.
+
+The fund fees are hardcoded to match the specific funds I hold in my PEA (Plan d’Epargne en Actions). I experimented with multiple strategies, though this benchmark assumes a continuous annual investment of €10,000 (approximately €830 per month).
+
+See the results for yourself!
 
 ---
 
