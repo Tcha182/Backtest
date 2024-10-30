@@ -45,20 +45,20 @@ selected_data = summary_table[summary_table['Duration (Years)'] == selected_dura
 # Get mean invested amount and display in the sidebar
 mean_invested_amount = selected_data['Mean_Invested_Amount'].mean()
 mean_invested_display = numerize.numerize(mean_invested_amount, 1)
-st.sidebar.metric(label="Invested Amount", value=f"€{mean_invested_display}")
+st.sidebar.metric(label="Invested Amount", value=f"{mean_invested_display}€")
 
 # Main page layout for metrics and plots
 st.header(f"Simulation Results for {selected_duration} Years")
 
 def display_metric(label, value, invested_amount):
-    formatted_value = f"€{numerize.numerize(value, 1)}"
+    formatted_value = f"{numerize.numerize(value, 1)}€"
     delta_value = value - invested_amount
-    delta = f"€{numerize.numerize(abs(delta_value), 1)}"
+    delta = f"{numerize.numerize(abs(delta_value), 1)}€"
     delta_color = "normal"
     st.metric(label=label, value=formatted_value, delta=f"-{delta}" if delta_value < 0 else delta, delta_color=delta_color)
 
 # Metrics section
-st.subheader("S&P 500 Strategy")
+st.subheader("S&P 500")
 col1, col2 = st.columns(2)
 with col1:
     sp500_min_value = selected_data[selected_data['Strategy'] == 'S&P 500']['Min_End_Value'].values[0]
@@ -67,7 +67,7 @@ with col2:
     sp500_median_value = selected_data[selected_data['Strategy'] == 'S&P 500']['Median_End_Value'].values[0]
     display_metric("Median End Value", sp500_median_value, mean_invested_amount)
 
-st.subheader("Leveraged S&P 500 Strategy")
+st.subheader("Leveraged S&P 500")
 col3, col4 = st.columns(2)
 with col3:
     leveraged_min_value = selected_data[selected_data['Strategy'] == 'Leveraged S&P 500']['Min_End_Value'].values[0]
