@@ -115,7 +115,7 @@ def save_fig_to_gcs(fig, file_name):
     plt.close(fig)  # Close figure to save memory
 
 def currency_format(x, pos):
-    return f'€{x:,.0f}'
+    return f'{x:,.0f}€'
 
 # Button to start simulation
 if st.button("Run Simulations"):
