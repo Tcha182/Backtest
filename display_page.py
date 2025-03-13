@@ -80,7 +80,7 @@ with col4:
 st.subheader(f"Distribution of End Portfolio Values")
 dist_blob_path = f"plots/distribution_{selected_duration}_years.png"
 dist_image = get_or_download_plot(dist_blob_path)
-st.image(dist_image, use_column_width=True)
+st.image(dist_image, use_container_width=True)
 
 
 st.subheader("Risk and potential Reward")
@@ -88,10 +88,10 @@ st.subheader("Risk and potential Reward")
 
 risk_curve_blob_path = f"plots/risk_curve_{selected_duration}_years.png"
 risk_curve_image = get_or_download_plot(risk_curve_blob_path)
-st.image(risk_curve_image, use_column_width=True, caption="Risk Curve")
+st.image(risk_curve_image, use_container_width=True, caption="Risk Curve")
 
 # Load and display box plot for selected duration
 
 box_plot_blob_path = f"plots/box_plot_{selected_duration}_years.png"
 box_plot_image = get_or_download_plot(box_plot_blob_path)
-st.image(box_plot_image, use_column_width=True, caption="Box Plot of Final Portfolio Values")
+st.image(box_plot_image, use_container_width=True, caption="Box Plot of Final Portfolio Values")
